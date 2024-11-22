@@ -1,0 +1,46 @@
+name: Create pull request
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev
+jobs:
+  create_pull_request:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checking if release PR already exists
+        id: check_pull_requst_exists
+        uses: actions/github-script@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { repo, owner } = context.repo;
+            const { data: pullRequests } = await github.pulls.list({
+              owner: owner,
+              repo: repo,
+              state: 'open',
+              head: 'dev',
+              base: 'main',
+            });
+            core.setOutput('pull_request_exists', pullRequests.length > 0);
+      - name: Create Pull Request
+        if: steps.check_pull_requst_exists.outputs.pull_request_exists == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PERSONAL_GITHUB_TOKEN }}
+          script: |
+            const { repo, owner } = context.repo;
+            const result = await github.rest.pulls.create({
+              title: 'Release ${{ github.run_number }}',
+              owner,
+              repo,
+              head: 'dev',
+              base: 'main',
+              body: 'This PR is auto-generated.'
+            });
+            github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: result.data.number,
+              labels: ['automated']
+            });

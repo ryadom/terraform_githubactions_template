@@ -1,0 +1,39 @@
+name: Terragrunt
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+jobs:
+  plan_apply:
+    runs-on: ubuntu-latest
+    env:
+      TERRAFORM_VERSION: 1.9.8
+      TERRAGRUNT_VERSION: 0.68.6
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      TF_VAR_example_variable: ${{ secrets.EXAMPLE_VARIABLE }}
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ["project"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cds-snc/terraform-tools-setup@v1
+      - uses: cds-snc/terraform-plan@v3.3.0
+        name: Terragrunt plan
+        id: plan
+        if: github.event_name == 'pull_request'
+        with:
+          comment-delete: true
+          comment-title: Terragrunt ${{ matrix.project }} Plan
+          directory: ./${{ matrix.project }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          terragrunt: true
+          skip-conftest: true
+      - name: Terragrunt apply
+        id: apply
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: ./${{ matrix.project }}
+        run: terragrunt apply -auto-approve
